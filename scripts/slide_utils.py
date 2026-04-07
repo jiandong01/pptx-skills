@@ -272,11 +272,12 @@ def _parse_body(lines: list[str], mermaid_idx: int) -> list:
             i += 1
             continue
 
-        # Blockquote
-        if line.strip().startswith('> '):
+        # Blockquote — match `> text` and bare `>` (empty blockquote line)
+        if line.strip().startswith('>'):
             bq_paras = []
-            while i < len(lines) and lines[i].strip().startswith('> '):
-                text = lines[i].strip()[2:]
+            while i < len(lines) and lines[i].strip().startswith('>'):
+                stripped = lines[i].strip()
+                text = stripped[2:] if stripped.startswith('> ') else stripped[1:]
                 bq_paras.append(Paragraph(runs=parse_inline(text)))
                 i += 1
             elements.append(BlockquoteElement(paragraphs=bq_paras))
@@ -310,7 +311,7 @@ def _parse_body(lines: list[str], mermaid_idx: int) -> list:
             elements.append(TextElement(paragraphs=paras))
             continue
 
-        # Plain text paragraph (collect consecutive non-empty lines)
+        # Plain text paragraph (collect consecutive non-empty, non-special lines)
         para_lines = []
         while i < len(lines) and lines[i].strip() and not lines[i].strip().startswith(('#', '>', '|', '-', '```', '!')):
             para_lines.append(lines[i].strip())
@@ -318,6 +319,8 @@ def _parse_body(lines: list[str], mermaid_idx: int) -> list:
         if para_lines:
             text = ' '.join(para_lines)
             elements.append(TextElement(paragraphs=[Paragraph(runs=parse_inline(text))]))
+        else:
+            i += 1  # safety: ensure forward progress if no branch consumed the line
 
     return elements
 

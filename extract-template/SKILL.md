@@ -2,7 +2,7 @@
 name: extract-template
 description: Extract a clean PPTX template (masters, layouts, theme) from an existing presentation and generate a markdown skeleton documenting available layouts. Use when the user wants to extract a template from a pptx file, create a reusable template, or inspect available slide layouts.
 license: MIT
-compatibility: Requires python-pptx, PyYAML, lxml, Pillow
+compatibility: Requires python-pptx, PyYAML, lxml, Pillow.
 metadata:
   author: pptx-skills
   version: "1.0"
@@ -33,7 +33,7 @@ Extract a clean template (masters/layouts/theme) from an existing pptx file, and
    - Number of slide masters and layouts found
    - Which layouts were actually used in the source presentation
    - Placeholder information for each used layout
-5. Show the generated `template.md` content to the user
+5. Show the generated `template.md` content to the user.
 
 **Output files:**
 - `<output_dir>/template.pptx` — Empty template preserving all masters, layouts, and themes
@@ -43,3 +43,4 @@ Extract a clean template (masters/layouts/theme) from an existing pptx file, and
 
 - The extracted template.pptx is intentionally empty (no slides). It preserves only the slide masters, layouts, and theme definitions. This is by design — it serves as a reusable base for the `build-slides` skill.
 - To verify the template is valid, open it in PowerPoint/WPS and check that layouts are available via "New Slide" → layout picker.
+- For presentations with embedded charts, use `extract-charts` to also extract chart data as reusable ```` ```chart ```` blocks.

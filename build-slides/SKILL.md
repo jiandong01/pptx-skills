@@ -1,11 +1,11 @@
 ---
 name: build-slides
-description: Build a PPTX presentation from Markdown content using an extracted template. Supports text, bullet lists, tables, images, blockquotes, and mermaid diagrams. Use when the user wants to generate slides from markdown or create a presentation.
+description: Build a PPTX presentation from Markdown content using an extracted template. Supports text, bullet lists, tables, images, blockquotes, mermaid diagrams, and native Excel charts. Use when the user wants to generate slides from markdown or create a presentation.
 license: MIT
 compatibility: Requires python-pptx, PyYAML, lxml, Pillow. Optional mermaid-cli (npx @mermaid-js/mermaid-cli) for diagram rendering.
 metadata:
   author: pptx-skills
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Build PPTX from Markdown
@@ -51,7 +51,70 @@ template: "templates/template.pptx"
 
 - `## Heading` — Slide title
 - `---` — Slide separator
-- `<!-- layout: "Layout Name" -->` — Force a specific layout
+- `<!-- layout: xxx -->` — Specify layout (see Layout Control below)
+
+### Layout Control
+
+You can control slide layouts in three ways:
+
+**1. Standard Layout Aliases (Recommended)**
+
+Use semantic layout names that work across any template:
+
+```markdown
+## My Slide
+<!-- layout: standard -->
+```
+
+**Standard Layout Types:**
+
+| Type | Alias | Description | Use Case |
+|------|-------|-------------|----------|
+| **Structural Layouts** |
+| cover | title-slide, 封面 | Title slide | Presentation opening |
+| toc | contents, agenda, 目录 | Table of contents | Chapter overview |
+| section | chapter, 章节 | Section divider | New chapter marker |
+| summary | conclusion, 总结 | Summary slide | Presentation ending |
+| **Content Layouts** |
+| standard | title-content, 标准 | Title + body | Most common (default) |
+| two-column | two-content, 双栏 | Left/right columns | Comparison, side-by-side |
+| image | picture, 图片 | Image display | Screenshots, diagrams |
+| chart | graph, 图表 | Chart display | Data visualization |
+| table | 表格 | Table display | Data comparison |
+| mixed | hybrid, 混合 | Text + image mix | Combined content |
+| title-only | blank, free, 仅标题 | Free layout | Custom positioning |
+
+**2. Layout Index**
+
+Use the numeric index from the template:
+
+```markdown
+## My Slide
+<!-- layout: 7 -->
+```
+
+**3. Template Layout Name**
+
+Use the exact layout name from the template:
+
+```markdown
+## My Slide
+<!-- layout: Title and Content -->
+```
+
+**Finding Available Layouts**
+
+List all layouts in your template:
+
+```bash
+python scripts/list_layouts.py template.pptx
+```
+
+This shows:
+- Layout index numbers
+- Layout names
+- Recommended standard aliases
+- Placeholder information
 
 ### Supported Content
 
@@ -59,24 +122,64 @@ template: "templates/template.pptx"
 |---------|--------|-------|
 | Bullet list | `- item` / `  - sub-item` | Indent with 2 spaces per level |
 | Bold/Italic | `**bold**` / `*italic*` | Inline formatting |
-| Table | Standard markdown table | Header + separator + rows |
+| Table | Standard markdown table | Centered text, auto-sized |
 | Image | `![alt](path)` | Auto-scaled to fit |
-| Blockquote | `> text` | Mapped to caption area in "Content with Caption" layout |
-| Mermaid | `` ```mermaid `` code block | Rendered to PNG via mermaid-cli |
+| Blockquote | `> text` | Mapped to caption area |
+| Mermaid | ` ```mermaid ` code block | Rendered to PNG via mermaid-cli |
+| Chart | ` ```chart ` YAML block | Native Excel chart (column, bar, line, pie) |
 
 ### Layout Auto-Selection
 
-The script automatically selects layouts based on content:
+When no layout is specified, the script automatically selects the best layout based on content:
 
-| Content Pattern | Layout Selected |
-|----------------|----------------|
-| Blockquote + text/table | Content with Caption |
-| Text + table | Content with Caption |
-| Image only (no text) | Title Only |
-| Empty body | Title Only |
-| Default | Title and Content |
+| Content Pattern | Layout Selected | Reason |
+|----------------|-----------------|--------|
+| Has chart(s) | chart (Title Only) | Charts need free positioning |
+| Image only (no text) | image | Optimized for visual display |
+| Blockquote + text/image | two-column | Left/right comparison |
+| Text + table | standard | Vertical stacking |
+| Table only | table | Table-optimized layout |
+| Empty body | title-only | Free layout for custom content |
+| Default | standard | Most common content type |
 
-You can override auto-selection with `<!-- layout: "Layout Name" -->`.
+**Override auto-selection** with `<!-- layout: xxx -->` on any slide.
+
+### Chart Blocks
+
+Embed native Excel charts using fenced YAML blocks:
+
+```yaml
+# inside a ```chart block
+type: column          # column | bar | line | pie
+title: "Chart Title"
+categories: [A, B, C]
+series:
+  - name: "Series 1"
+    values: [10, 20, 30]
+    color: "#C00000"  # optional hex color
+  - name: "Series 2"
+    values: [15, 25, 35]
+position: center      # left | right | center (default: center)
+width: "60%"          # percentage of slide width (default: 60%)
+labels: true          # show data labels (default: true)
+number_format: "0.0"  # number format for labels (optional)
+```
+
+Charts are embedded as native Excel objects — double-click in PowerPoint to edit data.
+
+**Note on percentage format:** When using `number_format: "0.0%"`, values must be decimals (e.g., `0.243` displays as `24.3%`). This follows Excel conventions.
+
+#### Multiple Charts
+
+Multiple chart blocks on one slide are auto-arranged:
+- 2 charts: side by side
+- 3+ charts: 2-column grid
+
+#### Chart + Table/Text
+
+When a slide has both text/tables and charts, content is split:
+- Text and tables on the left half
+- Charts on the right half
 
 ## Example
 

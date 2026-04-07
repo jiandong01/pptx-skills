@@ -38,6 +38,27 @@ This is a demo slide with bullet points:
 
 ---
 
+## Revenue Analysis
+
+Quarterly revenue shows strong growth momentum.
+
+| Quarter | Revenue |
+|---------|---------|
+| Q1 | $10M |
+| Q2 | $15M |
+
+```chart
+type: column
+title: "Quarterly Revenue"
+categories: [Q1, Q2, Q3, Q4]
+series:
+  - name: "Revenue ($M)"
+    values: [10, 15, 22, 28]
+    color: "#C00000"
+```
+
+---
+
 ## Summary
 
 - pptx-skills makes slide generation reproducible

@@ -65,6 +65,26 @@ class MermaidElement:
 
 
 @dataclass
+class ChartSeries:
+    name: str = ""
+    values: list[float] = field(default_factory=list)
+    color: str = ""  # hex color e.g. "#C00000", empty = auto
+
+
+@dataclass
+class ChartElement:
+    chart_type: str = "column"  # column | bar | line | pie
+    title: str = ""
+    categories: list[str] = field(default_factory=list)
+    series: list[ChartSeries] = field(default_factory=list)
+    position: str = "center"  # left | right | center
+    width: str = "60%"  # percentage of available width
+    labels: bool = True  # show data labels
+    legend: bool = False  # show legend (auto-true when >1 series)
+    number_format: str = ""  # e.g. "0.0%", "0.0", empty = auto
+
+
+@dataclass
 class SlideData:
     title: str = ""
     layout_hint: str | None = None
@@ -215,6 +235,35 @@ def _parse_body(lines: list[str], mermaid_idx: int) -> list:
             mermaid_idx += 1
             continue
 
+        # Chart code block
+        if line.strip().startswith('```chart'):
+            code_lines = []
+            i += 1
+            while i < len(lines) and not lines[i].strip().startswith('```'):
+                code_lines.append(lines[i])
+                i += 1
+            i += 1  # skip closing ```
+            chart_yaml = yaml.safe_load('\n'.join(code_lines))
+            if chart_yaml:
+                chart_el = ChartElement(
+                    chart_type=chart_yaml.get('type', 'column'),
+                    title=chart_yaml.get('title', ''),
+                    categories=chart_yaml.get('categories', []),
+                    position=chart_yaml.get('position', 'center'),
+                    width=chart_yaml.get('width', '60%'),
+                    labels=chart_yaml.get('labels', True),
+                    legend=chart_yaml.get('legend', False),
+                    number_format=chart_yaml.get('number_format', ''),
+                )
+                for s in chart_yaml.get('series', []):
+                    chart_el.series.append(ChartSeries(
+                        name=s.get('name', ''),
+                        values=s.get('values', []),
+                        color=s.get('color', ''),
+                    ))
+                elements.append(chart_el)
+            continue
+
         # Other code blocks - skip
         if line.strip().startswith('```'):
             i += 1
@@ -277,45 +326,154 @@ def _parse_body(lines: list[str], mermaid_idx: int) -> list:
 # Layout finder
 # ---------------------------------------------------------------------------
 
-def find_layout(prs: Presentation, name: str, master: int | None = None):
-    """Find a slide layout by name, optionally restricted to a specific master."""
-    for mi, m in enumerate(prs.slide_masters):
-        if master is not None and mi != master:
-            continue
-        for layout in m.slide_layouts:
-            if layout.name == name:
-                return layout
-    # Fallback: search all masters
-    for m in prs.slide_masters:
-        for layout in m.slide_layouts:
-            if layout.name == name:
-                return layout
-    raise ValueError(f"Layout '{name}' not found in template")
+from layout_standards import (
+    STANDARD_LAYOUTS,
+    get_layout_standard,
+    find_standard_by_keywords
+)
 
 
-def select_layout(slide: SlideData, prs: Presentation):
-    """Select the appropriate layout for a slide based on its content."""
+def find_layout_flexible(prs: Presentation, hint: str) -> tuple:
+    """灵活查找布局：支持索引、标准名称、别名、模板名称
+
+    Returns:
+        (layout, standard_name) - 布局对象和对应的标准名称（如果有）
+    """
+    # 1. 尝试按索引查找
+    try:
+        idx = int(hint)
+        layouts = prs.slide_master.slide_layouts
+        if 0 <= idx < len(layouts):
+            # 尝试推断标准名称
+            layout = layouts[idx]
+            std_name = find_standard_by_keywords(layout.name)
+            return (layout, std_name)
+    except (ValueError, AttributeError):
+        pass
+
+    # 2. 检查是否为标准布局名称或别名
+    layout_std = get_layout_standard(hint)
+    if layout_std:
+        # 在模板中查找匹配的布局
+        layout = _find_by_keywords(prs, layout_std.keywords)
+        if layout:
+            return (layout, layout_std.name)
+
+        # 找不到，尝试回退策略
+        fallback = _get_fallback_layout(prs, layout_std.name)
+        if fallback:
+            return fallback
+
+    # 3. 按模板布局名称精确匹配
+    for layout in prs.slide_master.slide_layouts:
+        if layout.name.lower() == hint.lower():
+            std_name = find_standard_by_keywords(layout.name)
+            return (layout, std_name)
+
+    # 4. 按模板布局名称模糊匹配
+    hint_lower = hint.lower()
+    for layout in prs.slide_master.slide_layouts:
+        if hint_lower in layout.name.lower():
+            std_name = find_standard_by_keywords(layout.name)
+            return (layout, std_name)
+
+    # 5. 找不到，返回默认布局
+    print(f"Warning: 找不到布局 '{hint}'，使用默认布局")
+    default_layout = _get_default_layout(prs)
+    return (default_layout, 'standard')
+
+
+def _find_by_keywords(prs: Presentation, keywords: list[str]):
+    """根据关键词列表查找布局"""
+    for keyword in keywords:
+        keyword_lower = keyword.lower()
+        for layout in prs.slide_master.slide_layouts:
+            if keyword_lower in layout.name.lower():
+                return layout
+    return None
+
+
+def _get_fallback_layout(prs: Presentation, std_name: str) -> tuple:
+    """获取回退布局"""
+    fallback_map = {
+        'cover': ['section', 'title-only', 'standard'],
+        'toc': ['standard', 'title-only'],
+        'section': ['cover', 'title-only', 'standard'],
+        'summary': ['section', 'cover', 'standard'],
+        'image': ['title-only', 'standard'],
+        'chart': ['title-only', 'standard'],
+        'table': ['standard', 'title-only'],
+        'mixed': ['two-column', 'standard'],
+        'two-column': ['standard', 'title-only'],
+    }
+
+    fallbacks = fallback_map.get(std_name, ['standard'])
+    for fallback_name in fallbacks:
+        fallback_std = get_layout_standard(fallback_name)
+        if fallback_std:
+            layout = _find_by_keywords(prs, fallback_std.keywords)
+            if layout:
+                print(f"  使用回退布局: {fallback_name} ({layout.name})")
+                return (layout, fallback_name)
+
+    # 最后的保底
+    default_layout = _get_default_layout(prs)
+    return (default_layout, 'standard')
+
+
+def _get_default_layout(prs: Presentation):
+    """Return the best fallback layout: prefer 'Title and Content', else first with a title ph."""
+    for layout in prs.slide_master.slide_layouts:
+        name_lower = layout.name.lower()
+        if 'title' in name_lower and 'content' in name_lower:
+            return layout
+        if any(ph.placeholder_format.type == 1 for ph in layout.placeholders):
+            return layout
+    return prs.slide_master.slide_layouts[0]
+
+
+def find_layout(prs: Presentation, name: str):
+    """Thin wrapper around find_layout_flexible for callers that only need the layout."""
+    layout, _ = find_layout_flexible(prs, name)
+    return layout
+
+
+def select_layout(slide: SlideData, prs: Presentation) -> tuple:
+    """Select the appropriate layout for a slide.
+
+    Returns:
+        (layout, std_name) — layout 对象 + 标准布局名称（用于 populate 函数路由）
+    """
     if slide.layout_hint:
-        return find_layout(prs, slide.layout_hint)
+        return find_layout_flexible(prs, slide.layout_hint)
 
-    has_bq = any(isinstance(e, BlockquoteElement) for e in slide.body_elements)
-    has_table = any(isinstance(e, TableElement) for e in slide.body_elements)
-    has_text = any(isinstance(e, TextElement) for e in slide.body_elements)
-    has_image = any(isinstance(e, ImageElement) or isinstance(e, MermaidElement)
-                    for e in slide.body_elements)
-    body_count = len(slide.body_elements)
+    has_chart = has_image = has_table = has_blockquote = has_text = False
+    for e in slide.body_elements:
+        if isinstance(e, ChartElement):
+            has_chart = True
+        elif isinstance(e, (ImageElement, MermaidElement)):
+            has_image = True
+        elif isinstance(e, TableElement):
+            has_table = True
+        elif isinstance(e, BlockquoteElement):
+            has_blockquote = True
+        elif isinstance(e, TextElement):
+            has_text = True
 
-    # Content with Caption: blockquote+content, or text+table combo
-    if has_bq and (has_table or has_text):
-        return find_layout(prs, "Content with Caption", master=0)
-    if has_text and has_table:
-        return find_layout(prs, "Content with Caption", master=0)
-    # Empty body or image-only
-    if body_count == 0:
-        return find_layout(prs, "Title Only", master=1)
-    if has_image and not has_text and not has_table and not has_bq:
-        return find_layout(prs, "Title Only", master=1)
-    return find_layout(prs, "Title and Content", master=1)
+    if has_chart:
+        std_name = 'chart'
+    elif has_image and not has_text and not has_table:
+        std_name = 'image'
+    elif has_blockquote or (has_text and has_image):
+        std_name = 'two-column'
+    elif has_table and not has_text:
+        std_name = 'table'
+    elif not slide.body_elements:
+        std_name = 'title-only'
+    else:
+        std_name = 'standard'
+
+    return find_layout_flexible(prs, std_name)
 
 
 # ---------------------------------------------------------------------------
@@ -366,6 +524,7 @@ def add_table_to_slide(slide, table_el: TableElement, left, top, width, height):
     """Add a formatted table shape to a slide."""
     from pptx.util import Pt, Emu
     from pptx.dml.color import RGBColor
+    from pptx.enum.text import PP_ALIGN
 
     n_rows = len(table_el.rows) + 1  # +1 for header
     n_cols = len(table_el.headers)
@@ -385,9 +544,10 @@ def add_table_to_slide(slide, table_el: TableElement, left, top, width, height):
         cell = table.cell(0, ci)
         cell.text = header
         for para in cell.text_frame.paragraphs:
+            para.alignment = PP_ALIGN.CENTER
             for run in para.runs:
                 run.font.bold = True
-                run.font.size = Pt(11)
+                run.font.size = Pt(14)
 
     # Fill data rows
     for ri, row in enumerate(table_el.rows):
@@ -396,8 +556,9 @@ def add_table_to_slide(slide, table_el: TableElement, left, top, width, height):
                 cell = table.cell(ri + 1, ci)
                 cell.text = cell_text
                 for para in cell.text_frame.paragraphs:
+                    para.alignment = PP_ALIGN.CENTER
                     for run in para.runs:
-                        run.font.size = Pt(10)
+                        run.font.size = Pt(12)
 
     return tbl_shape
 
@@ -512,6 +673,9 @@ def wps_fixup(pptx_path: str):
         'slideLayout': 'application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml',
         'theme': 'application/vnd.openxmlformats-officedocument.theme+xml',
         'notesSlide': 'application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml',
+        'chart': 'application/vnd.openxmlformats-officedocument.drawingml.chart+xml',
+        'chartStyle': 'application/vnd.ms-office.chartstyle+xml',
+        'chartColorStyle': 'application/vnd.ms-office.chartcolorstyle+xml',
     }
 
     # Check all slide-related XML files have Content_Types entries

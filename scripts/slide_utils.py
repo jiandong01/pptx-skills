@@ -311,9 +311,23 @@ def _parse_body(lines: list[str], mermaid_idx: int) -> list:
             elements.append(TextElement(paragraphs=paras))
             continue
 
+        # Ordered list
+        if re.match(r'^\s*\d+[.)]\s', line):
+            paras = []
+            while i < len(lines) and re.match(r'^\s*\d+[.)]\s', lines[i]):
+                stripped = lines[i].strip()
+                text = re.sub(r'^\d+[.)]\s+', '', stripped)
+                level = (len(lines[i]) - len(lines[i].lstrip())) // 2
+                paras.append(Paragraph(runs=parse_inline(text), level=level))
+                i += 1
+            elements.append(TextElement(paragraphs=paras))
+            continue
+
         # Plain text paragraph (collect consecutive non-empty, non-special lines)
         para_lines = []
-        while i < len(lines) and lines[i].strip() and not lines[i].strip().startswith(('#', '>', '|', '-', '```', '!')):
+        while (i < len(lines) and lines[i].strip()
+               and not lines[i].strip().startswith(('#', '>', '|', '-', '```', '!'))
+               and not re.match(r'^\s*\d+[.)]\s', lines[i])):
             para_lines.append(lines[i].strip())
             i += 1
         if para_lines:
@@ -417,7 +431,7 @@ def _get_fallback_layout(prs: Presentation, std_name: str) -> tuple:
             layout = _find_by_keywords(prs, fallback_std.keywords)
             if layout:
                 print(f"  使用回退布局: {fallback_name} ({layout.name})")
-                return (layout, fallback_name)
+                return (layout, std_name)
 
     # 最后的保底
     default_layout = _get_default_layout(prs)

@@ -6,6 +6,7 @@ dist/
 build/
 .eggs/
 *.pptx
+!examples/default.pptx
 templates/
 slides-img/
 .DS_Store

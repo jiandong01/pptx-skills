@@ -377,11 +377,18 @@ def main():
     template = args.template or pdata.template
     output = args.output or pdata.output
 
+    # Resolve template path relative to the input md file's directory
+    md_dir = os.path.dirname(os.path.abspath(args.input))
+    if template and not os.path.isabs(template):
+        template_rel = os.path.join(md_dir, template)
+        if os.path.exists(template_rel):
+            template = template_rel
+
     if not os.path.exists(template):
         # 尝试使用默认模板（相对于脚本所在目录）
         default_template = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            '..', '..', 'template', 'default.pptx'
+            '..', 'examples', 'default.pptx'
         )
         if os.path.exists(default_template):
             print(f"Warning: 模板 {template!r} 不存在，使用默认模板: {default_template}")

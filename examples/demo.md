@@ -1,7 +1,7 @@
 ---
 title: "pptx-skills 演示"
 subtitle: "Markdown → PPTX 自动化生成"
-template: "template/default.pptx"
+template: "default.pptx"
 output: "examples/demo.pptx"
 ---
 
@@ -18,7 +18,7 @@ output: "examples/demo.pptx"
 ## 第一部分：基础文本布局
 <!-- layout: section -->
 
-标题 + 内容页，支持列表、加粗、斜体等 Markdown 格式。
+文本与表格布局示例
 
 ---
 
@@ -51,7 +51,7 @@ output: "examples/demo.pptx"
 ## 第二部分：双栏对比布局
 <!-- layout: section -->
 
-使用 blockquote 划分左右两栏。
+左右对比，blockquote 为左栏
 
 ---
 
@@ -77,7 +77,7 @@ output: "examples/demo.pptx"
 ## 第三部分：图表布局
 <!-- layout: section -->
 
-使用 ```chart 块嵌入原生 Excel 图表。
+原生 Excel 图表嵌入示例
 
 ---
 

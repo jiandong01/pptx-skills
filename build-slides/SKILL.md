@@ -75,6 +75,8 @@ Use semantic layout names that work across any template:
 | toc | contents, agenda, 目录 | Table of contents | Chapter overview |
 | section | chapter, 章节 | Section divider | New chapter marker |
 | summary | conclusion, 总结 | Summary slide | Presentation ending |
+
+> **section 页注意**：body 内容会填入副标题占位符，空间有限。只写一句简短的章节描述（≤20 字），不要放完整的正文内容，否则会溢出。
 | **Content Layouts** |
 | standard | title-content, 标准 | Title + body | Most common (default) |
 | two-column | two-content, 双栏 | Left/right columns | Comparison, side-by-side |

@@ -32,12 +32,15 @@ from slide_utils import (
 )
 from chart_utils import add_chart_to_slide, parse_width_pct
 
-# Default content-area geometry (EMU) — matches the slide master content region
-_CL  = Emu(838200)    # content left   (~0.69")
-_CT  = Emu(1825625)   # content top    (~1.50")
-_CW  = Emu(10515600)  # content width  (~8.67")
-_CH  = Emu(4500000)   # content height (~3.71")
-_GAP = Emu(200000)    # column gap     (~0.165")
+# Fallback content-area geometry (EMU) — used only when the template has no
+# placeholder to read from (e.g. title-only / free layouts).
+# When a proper template is used these values are never consulted for standard
+# or two-column slides — the template's placeholder positions take precedence.
+_CL  = Emu(457200)    # fallback left   (~0.50")
+_CT  = Emu(1143000)   # fallback top    (~1.25")
+_CW  = Emu(10972800)  # fallback width  (~12.00")
+_CH  = Emu(5143500)   # fallback height (~5.63")
+_GAP = Emu(200000)    # column gap      (~0.165")
 
 
 _STRUCTURAL_LAYOUTS = {'cover', 'toc', 'section'}
@@ -247,11 +250,9 @@ def _two_col_region(slide):
         top    = left_ph.top
         height = left_ph.height
         width  = (right_ph.left + right_ph.width if right_ph else left_ph.left + left_ph.width) - left
+        return left_ph, right_ph, left, top, width, height
     else:
-        left, top = _CL, _CT
-        width, height = _CW, _CH
-
-    return left_ph, right_ph, left, top, width, height
+        return None, None, _CL, _CT, _CW, _CH
 
 
 def populate_two_content_layout(slide, slide_data: SlideData):

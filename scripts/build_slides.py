@@ -12,10 +12,13 @@ documentation.
 from __future__ import annotations
 
 import argparse
+import copy as _copy
 import os
 import sys
 
+from lxml import etree
 from pptx import Presentation
+from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt, Emu
 
 from slide_utils import (
@@ -35,6 +38,76 @@ _CT  = Emu(1825625)   # content top    (~1.50")
 _CW  = Emu(10515600)  # content width  (~8.67")
 _CH  = Emu(4500000)   # content height (~3.71")
 _GAP = Emu(200000)    # column gap     (~0.165")
+
+
+_STRUCTURAL_LAYOUTS = {'cover', 'toc', 'section'}
+
+_SLIDE_W   = 12192000  # standard 16:9 slide width (EMU)
+_SLDNUM_CX = 2000000
+_SLDNUM_CY = 292196
+_SLDNUM_Y  = 6394353   # same baseline as footer elements
+
+
+def _inject_slide_number(slide):
+    """Copy sldNum placeholder from layout into slide's spTree so WPS renders it.
+
+    WPS does not walk up to the layout/master to inherit placeholder shapes, so
+    the placeholder must be explicitly present in the slide XML.
+    Repositioned to center-bottom with a '#' prefix (e.g. '#4').
+    """
+    layout = slide.slide_layout
+    sldnum_sp = None
+    for sp in layout._element.findall('.//' + qn('p:sp')):
+        ph = sp.find('.//' + qn('p:ph'))
+        if ph is not None and ph.get('type') == 'sldNum':
+            sldnum_sp = sp
+            break
+
+    if sldnum_sp is None:
+        return
+
+    sp_tree = slide._element.find('.//' + qn('p:spTree'))
+    if sp_tree is None:
+        return
+
+    sp_copy = _copy.deepcopy(sldnum_sp)
+
+    cNvPr = sp_copy.find('.//' + qn('p:cNvPr'))
+    if cNvPr is not None:
+        existing_ids = {int(e.get('id', 0))
+                        for e in sp_tree.findall('.//' + qn('p:cNvPr'))
+                        if e.get('id')}
+        cNvPr.set('id', str(max(existing_ids, default=0) + 1))
+
+    xfrm = sp_copy.find('.//' + qn('a:xfrm'))
+    if xfrm is not None:
+        off = xfrm.find(qn('a:off'))
+        ext = xfrm.find(qn('a:ext'))
+        if off is not None:
+            off.set('x', str((_SLIDE_W - _SLDNUM_CX) // 2))
+            off.set('y', str(_SLDNUM_Y))
+        if ext is not None:
+            ext.set('cx', str(_SLDNUM_CX))
+            ext.set('cy', str(_SLDNUM_CY))
+
+    txBody = sp_copy.find(qn('p:txBody'))
+    if txBody is not None:
+        for lvl_pPr in txBody.findall('.//' + qn('a:lvl1pPr')):
+            lvl_pPr.set('algn', 'ctr')
+        para = txBody.find(qn('a:p'))
+        if para is not None:
+            fld = para.find(qn('a:fld'))
+            rPr_src = fld.find(qn('a:rPr')) if fld is not None else None
+            run = etree.Element(qn('a:r'))
+            if rPr_src is not None:
+                run.append(_copy.deepcopy(rPr_src))
+            etree.SubElement(run, qn('a:t')).text = '#'
+            if fld is not None:
+                fld.addprevious(run)
+            else:
+                para.append(run)
+
+    sp_tree.append(sp_copy)
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +424,9 @@ def build_presentation(pdata: PresentationData, template_path: str, output_path:
             populate_title_only(slide, slide_data)
         else:  # standard, table, mixed 及其他
             populate_standard_layout(slide, slide_data)
+
+        if std_name not in _STRUCTURAL_LAYOUTS:
+            _inject_slide_number(slide)
 
         print(f"  Slide {si+2}: \"{slide_data.title}\" -> {layout.name} ({std_name})")
 

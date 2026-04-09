@@ -137,19 +137,6 @@ def _set_chart_title(chart, title: str):
         chart.has_title = False
 
 
-def _position_chart(chart_el, content_left, content_top, content_width, content_height):
-    """Compute (left, top, w, h) for a single chart given position/width hints."""
-    pct = parse_width_pct(chart_el.width)
-    chart_w = int(content_width * pct)
-    if chart_el.position == "left":
-        chart_left = content_left
-    elif chart_el.position == "right":
-        chart_left = content_left + content_width - chart_w
-    else:
-        chart_left = content_left + (content_width - chart_w) // 2
-    return chart_left, content_top, chart_w, content_height
-
-
 # ---------------------------------------------------------------------------
 # Category chart
 # ---------------------------------------------------------------------------

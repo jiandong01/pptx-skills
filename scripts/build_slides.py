@@ -29,6 +29,13 @@ from slide_utils import (
 )
 from chart_utils import add_chart_to_slide, parse_width_pct
 
+# Default content-area geometry (EMU) — matches the slide master content region
+_CL  = Emu(838200)    # content left   (~0.69")
+_CT  = Emu(1825625)   # content top    (~1.50")
+_CW  = Emu(10515600)  # content width  (~8.67")
+_CH  = Emu(4500000)   # content height (~3.71")
+_GAP = Emu(200000)    # column gap     (~0.165")
+
 
 # ---------------------------------------------------------------------------
 # Slide population
@@ -98,8 +105,8 @@ def populate_standard_layout(slide, slide_data: SlideData):
             tbl_width = body_ph.width
             tbl_height = body_ph.height // 2 if text_elements else body_ph.height
         else:
-            tbl_left, tbl_top = Emu(838200), Emu(1825625)
-            tbl_width, tbl_height = Emu(10515600), Emu(2500000)
+            tbl_left, tbl_top = _CL, _CT
+            tbl_width, tbl_height = _CW, Emu(2500000)
         for tbl_el in table_elements:
             add_table_to_slide(slide, tbl_el, tbl_left, tbl_top, tbl_width, tbl_height)
 
@@ -108,8 +115,8 @@ def populate_standard_layout(slide, slide_data: SlideData):
             img_left, img_top = body_ph.left, body_ph.top
             img_max_w, img_max_h = body_ph.width, body_ph.height
         else:
-            img_left, img_top = Emu(838200), Emu(1825625)
-            img_max_w, img_max_h = Emu(10515600), Emu(4500000)
+            img_left, img_top = _CL, _CT
+            img_max_w, img_max_h = _CW, _CH
         _stack_images(slide, image_elements, img_left, img_top, img_max_w, img_max_h)
 
 
@@ -119,7 +126,7 @@ def populate_title_only(slide, slide_data: SlideData):
     image_elements = [e for e in slide_data.body_elements if isinstance(e, ImageElement)]
     if image_elements:
         _stack_images(slide, image_elements,
-                      Emu(838200), Emu(1825625), Emu(10515600), Emu(4500000))
+                      _CL, _CT, _CW, _CH)
 
 
 def populate_chart_layout(slide, slide_data: SlideData):
@@ -130,34 +137,25 @@ def populate_chart_layout(slide, slide_data: SlideData):
     if not chart_elements:
         return
 
-    CL, CT = Emu(838200), Emu(1825625)
-    CW, CH = Emu(10515600), Emu(4500000)
-    gap = Emu(200000)
-
     if len(chart_elements) == 1:
         chart_el = chart_elements[0]
-        pct = parse_width_pct(chart_el.width)
-        chart_w = int(CW * pct)
+        chart_w = int(_CW * parse_width_pct(chart_el.width))
         if chart_el.position == "left":
-            chart_left = CL
+            chart_left = _CL
         elif chart_el.position == "right":
-            chart_left = CL + CW - chart_w
+            chart_left = _CL + _CW - chart_w
         else:
-            chart_left = CL + (CW - chart_w) // 2
-        add_chart_to_slide(slide, chart_el, chart_left, CT, chart_w, CH)
-    elif len(chart_elements) == 2:
-        chart_w = (CW - gap) // 2
-        for ci, chart_el in enumerate(chart_elements):
-            add_chart_to_slide(slide, chart_el, CL + ci * (chart_w + gap), CT, chart_w, CH)
+            chart_left = _CL + (_CW - chart_w) // 2
+        add_chart_to_slide(slide, chart_el, chart_left, _CT, chart_w, _CH)
     else:
-        chart_w = (CW - gap) // 2
+        chart_w = (_CW - _GAP) // 2
         rows = (len(chart_elements) + 1) // 2
-        chart_h = (CH - gap * (rows - 1)) // rows
+        chart_h = (_CH - _GAP * (rows - 1)) // rows
         for ci, chart_el in enumerate(chart_elements):
             row, col = divmod(ci, 2)
             add_chart_to_slide(slide, chart_el,
-                               CL + col * (chart_w + gap),
-                               CT + row * (chart_h + gap),
+                               _CL + col * (chart_w + _GAP),
+                               _CT + row * (chart_h + _GAP),
                                chart_w, chart_h)
 
 
@@ -177,8 +175,8 @@ def _two_col_region(slide):
         height = left_ph.height
         width  = (right_ph.left + right_ph.width if right_ph else left_ph.left + left_ph.width) - left
     else:
-        left, top = Emu(838200), Emu(1825625)
-        width, height = Emu(10515600), Emu(4500000)
+        left, top = _CL, _CT
+        width, height = _CW, _CH
 
     return left_ph, right_ph, left, top, width, height
 
@@ -193,9 +191,8 @@ def populate_two_content_layout(slide, slide_data: SlideData):
     image_elements = [e for e in slide_data.body_elements if isinstance(e, ImageElement)]
 
     left_ph, right_ph, rl, rt, rw, rh = _two_col_region(slide)
-    gap    = Emu(200000)
-    half_w = (rw - gap) // 2
-    right_l = rl + half_w + gap
+    half_w = (rw - _GAP) // 2
+    right_l = rl + half_w + _GAP
 
     if bq_elements:
         left_paras  = [p for bq in bq_elements for p in bq.paragraphs]
@@ -234,9 +231,8 @@ def populate_mixed_layout(slide, slide_data: SlideData):
     chart_elements = [e for e in slide_data.body_elements if isinstance(e, ChartElement)]
 
     left_ph, right_ph, rl, rt, rw, rh = _two_col_region(slide)
-    gap    = Emu(200000)
-    half_w = (rw - gap) // 2
-    right_l = rl + half_w + gap
+    half_w = (rw - _GAP) // 2
+    right_l = rl + half_w + _GAP
 
     # Left: text
     all_text_paras = []
@@ -265,10 +261,10 @@ def populate_mixed_layout(slide, slide_data: SlideData):
         chart_w    = right_ph.width  if right_ph else half_w
         chart_h    = right_ph.height if right_ph else rh
         n = len(chart_elements)
-        per_h = (chart_h - gap * (n - 1)) // n
+        per_h = (chart_h - _GAP * (n - 1)) // n
         for ci, chart_el in enumerate(chart_elements):
             add_chart_to_slide(slide, chart_el,
-                               chart_left, chart_top + ci * (per_h + gap),
+                               chart_left, chart_top + ci * (per_h + _GAP),
                                chart_w, per_h)
 
 

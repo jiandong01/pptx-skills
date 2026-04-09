@@ -518,19 +518,36 @@ def select_layout(slide: SlideData, prs: Presentation) -> tuple:
 # ---------------------------------------------------------------------------
 
 def set_text_frame(text_frame, paragraphs: list[Paragraph], clear: bool = True):
-    """Fill a text frame with formatted paragraphs."""
+    """Fill a text frame with formatted paragraphs.
+
+    Heading detection: a level=0 paragraph whose runs are all bold is treated as
+    an in-slide heading — bullet is suppressed and font size is slightly increased.
+    """
+    from lxml import etree
+    from pptx.oxml.ns import qn as _qn
+    from pptx.util import Pt
+
     if clear:
         text_frame.clear()
 
+    total = len(paragraphs)
     for pi, para in enumerate(paragraphs):
         if pi == 0:
             p = text_frame.paragraphs[0]
         else:
             p = text_frame.add_paragraph()
         p.level = para.level
+
+        # Heading detection: level=0, all bold runs, not alone in the frame
+        is_heading = (
+            para.level == 0
+            and bool(para.runs)
+            and all(r.bold for r in para.runs)
+            and total > 1
+        )
+
         for ri, run_data in enumerate(para.runs):
             if ri == 0 and pi == 0 and clear:
-                # Reuse the existing run in the first paragraph
                 run = p.runs[0] if p.runs else p.add_run()
                 run.text = run_data.text
             else:
@@ -540,6 +557,17 @@ def set_text_frame(text_frame, paragraphs: list[Paragraph], clear: bool = True):
                 run.font.bold = True
             if run_data.italic:
                 run.font.italic = True
+            if is_heading:
+                run.font.size = Pt(16)
+
+        if is_heading:
+            # Suppress bullet inherited from placeholder's list style
+            pPr = p._p.get_or_add_pPr()
+            # Remove any existing buChar/buFont/buClr first
+            for tag in ('a:buNone', 'a:buChar', 'a:buFont', 'a:buClr', 'a:buAutoNum'):
+                for el in pPr.findall(_qn(tag)):
+                    pPr.remove(el)
+            etree.SubElement(pPr, _qn('a:buNone'))
 
 
 def collect_text_paragraphs(elements: list) -> list[Paragraph]:

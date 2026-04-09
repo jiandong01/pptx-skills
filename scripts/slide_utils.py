@@ -68,20 +68,31 @@ class MermaidElement:
 class ChartSeries:
     name: str = ""
     values: list[float] = field(default_factory=list)
-    color: str = ""  # hex color e.g. "#C00000", empty = auto
+    color: str = ""          # hex color e.g. "#C00000", empty = auto
+    # scatter/bubble
+    x_values: list[float] = field(default_factory=list)
+    y_values: list[float] = field(default_factory=list)
+    sizes: list[float] = field(default_factory=list)   # bubble only
+    # combo
+    subtype: str = ""        # "bar" | "line" — for combo charts
+    axis: str = "primary"    # "primary" | "secondary" — for combo line series
+    number_format: str = ""  # per-series format override
 
 
 @dataclass
 class ChartElement:
-    chart_type: str = "column"  # column | bar | line | pie
+    chart_type: str = "column"
     title: str = ""
     categories: list[str] = field(default_factory=list)
     series: list[ChartSeries] = field(default_factory=list)
-    position: str = "center"  # left | right | center
-    width: str = "60%"  # percentage of available width
-    labels: bool = True  # show data labels
-    legend: bool = False  # show legend (auto-true when >1 series)
-    number_format: str = ""  # e.g. "0.0%", "0.0", empty = auto
+    position: str = "center"   # left | right | center
+    width: str = "60%"
+    labels: bool = True
+    legend: bool = False
+    number_format: str = ""    # global format
+    # waterfall
+    totals: list[int] = field(default_factory=list)   # index positions of total bars
+    colors: dict = field(default_factory=dict)         # {gain, loss, total} overrides
 
 
 @dataclass
@@ -254,12 +265,20 @@ def _parse_body(lines: list[str], mermaid_idx: int) -> list:
                     labels=chart_yaml.get('labels', True),
                     legend=chart_yaml.get('legend', False),
                     number_format=chart_yaml.get('number_format', ''),
+                    totals=chart_yaml.get('totals', []),
+                    colors=chart_yaml.get('colors', {}),
                 )
                 for s in chart_yaml.get('series', []):
                     chart_el.series.append(ChartSeries(
                         name=s.get('name', ''),
                         values=s.get('values', []),
                         color=s.get('color', ''),
+                        x_values=s.get('x_values', []),
+                        y_values=s.get('y_values', []),
+                        sizes=s.get('sizes', []),
+                        subtype=s.get('subtype', ''),
+                        axis=s.get('axis', 'primary'),
+                        number_format=s.get('number_format', ''),
                     ))
                 elements.append(chart_el)
             continue

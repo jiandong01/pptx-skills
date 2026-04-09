@@ -114,7 +114,7 @@ def populate_standard_layout(slide, slide_data: SlideData):
 
 
 def populate_title_only(slide, slide_data: SlideData):
-    """Populate a Title Only layout (title + free-form images)."""
+    """Title Only layout — title + free-form images."""
     _set_title(slide, slide_data.title)
     image_elements = [e for e in slide_data.body_elements if isinstance(e, ImageElement)]
     if image_elements:
@@ -123,93 +123,46 @@ def populate_title_only(slide, slide_data: SlideData):
 
 
 def populate_chart_layout(slide, slide_data: SlideData):
-    """Populate a free-form layout with charts (and optional text/tables on the side)."""
+    """Title Only layout with free-form charts. Pure chart rendering — no text."""
     _set_title(slide, slide_data.title)
 
     chart_elements = [e for e in slide_data.body_elements if isinstance(e, ChartElement)]
-    text_elements = [e for e in slide_data.body_elements
-                     if isinstance(e, (TextElement, BlockquoteElement))]
-    table_elements = [e for e in slide_data.body_elements if isinstance(e, TableElement)]
-    image_elements = [e for e in slide_data.body_elements if isinstance(e, ImageElement)]
+    if not chart_elements:
+        return
 
-    content_left = Emu(838200)
-    content_top = Emu(1825625)
-    content_width = Emu(10515600)
-    content_height = Emu(4500000)
+    CL, CT = Emu(838200), Emu(1825625)
+    CW, CH = Emu(10515600), Emu(4500000)
+    gap = Emu(200000)
 
-    if text_elements or table_elements:
-        # Side-by-side: text/table left, charts right
-        half_w = content_width // 2 - Emu(100000)
-        right_left = content_left + half_w + Emu(200000)
-
-        if text_elements:
-            all_paras = collect_text_paragraphs(text_elements)
-            if all_paras:
-                set_text_frame(
-                    slide.shapes.add_textbox(content_left, content_top, half_w, content_height).text_frame,
-                    all_paras,
-                )
-        for tbl_el in table_elements:
-            tbl_top = content_top + content_height // 3 if text_elements else content_top
-            add_table_to_slide(slide, tbl_el, content_left, tbl_top, half_w, content_height * 2 // 3)
-
-        n_charts = len(chart_elements)
-        per_h = content_height // n_charts
-        for ci, chart_el in enumerate(chart_elements):
-            add_chart_to_slide(slide, chart_el, right_left, content_top + per_h * ci,
-                               half_w, per_h - Emu(100000))
-    else:
-        n_charts = len(chart_elements)
-        gap = Emu(200000)
-        if n_charts == 1:
-            chart_el = chart_elements[0]
-            pct = parse_width_pct(chart_el.width)
-            chart_w = int(content_width * pct)
-            if chart_el.position == "left":
-                chart_left = content_left
-            elif chart_el.position == "right":
-                chart_left = content_left + content_width - chart_w
-            else:
-                chart_left = content_left + (content_width - chart_w) // 2
-            add_chart_to_slide(slide, chart_el, chart_left, content_top, chart_w, content_height)
-        elif n_charts == 2:
-            chart_w = (content_width - gap) // 2
-            for ci, chart_el in enumerate(chart_elements):
-                add_chart_to_slide(slide, chart_el, content_left + ci * (chart_w + gap),
-                                   content_top, chart_w, content_height)
+    if len(chart_elements) == 1:
+        chart_el = chart_elements[0]
+        pct = parse_width_pct(chart_el.width)
+        chart_w = int(CW * pct)
+        if chart_el.position == "left":
+            chart_left = CL
+        elif chart_el.position == "right":
+            chart_left = CL + CW - chart_w
         else:
-            chart_w = (content_width - gap) // 2
-            rows = (n_charts + 1) // 2
-            chart_h = (content_height - gap * (rows - 1)) // rows
-            for ci, chart_el in enumerate(chart_elements):
-                row, col = divmod(ci, 2)
-                add_chart_to_slide(slide, chart_el,
-                                   content_left + col * (chart_w + gap),
-                                   content_top + row * (chart_h + gap),
-                                   chart_w, chart_h)
+            chart_left = CL + (CW - chart_w) // 2
+        add_chart_to_slide(slide, chart_el, chart_left, CT, chart_w, CH)
+    elif len(chart_elements) == 2:
+        chart_w = (CW - gap) // 2
+        for ci, chart_el in enumerate(chart_elements):
+            add_chart_to_slide(slide, chart_el, CL + ci * (chart_w + gap), CT, chart_w, CH)
+    else:
+        chart_w = (CW - gap) // 2
+        rows = (len(chart_elements) + 1) // 2
+        chart_h = (CH - gap * (rows - 1)) // rows
+        for ci, chart_el in enumerate(chart_elements):
+            row, col = divmod(ci, 2)
+            add_chart_to_slide(slide, chart_el,
+                               CL + col * (chart_w + gap),
+                               CT + row * (chart_h + gap),
+                               chart_w, chart_h)
 
-    if image_elements:
-        img_max_h = Emu(1200000)
-        img_top = content_top + content_height - img_max_h
-        n = len(image_elements)
-        for ii, img_el in enumerate(image_elements):
-            per_w = content_width // n
-            add_image_to_slide(slide, img_el.path, content_left + per_w * ii, img_top, per_w, img_max_h)
 
-
-def populate_two_content_layout(slide, slide_data: SlideData):
-    """Populate a Two Content layout: blockquote → left, text → right.
-
-    Prefers idx=1 (left) and idx=2 (right) placeholders.
-    Falls back to two textboxes when the template only has one content placeholder.
-    """
-    _set_title(slide, slide_data.title)
-
-    bq_elements    = [e for e in slide_data.body_elements if isinstance(e, BlockquoteElement)]
-    text_elements  = [e for e in slide_data.body_elements if isinstance(e, TextElement)]
-    table_elements = [e for e in slide_data.body_elements if isinstance(e, TableElement)]
-    image_elements = [e for e in slide_data.body_elements if isinstance(e, ImageElement)]
-
+def _two_col_region(slide):
+    """Return (left_ph, right_ph, left, top, width, height) for two-column layouts."""
     left_ph = right_ph = None
     for ph in slide.placeholders:
         idx = ph.placeholder_format.idx
@@ -218,24 +171,31 @@ def populate_two_content_layout(slide, slide_data: SlideData):
         elif idx == 2:
             right_ph = ph
 
-    # Derive split region from the left placeholder (or defaults)
     if left_ph:
-        region_left   = left_ph.left
-        region_top    = left_ph.top
-        region_height = left_ph.height
-        if right_ph:
-            # Both placeholders exist — compute total width
-            right_end    = right_ph.left + right_ph.width
-            region_width = right_end - region_left
-        else:
-            region_width = left_ph.width
+        left   = left_ph.left
+        top    = left_ph.top
+        height = left_ph.height
+        width  = (right_ph.left + right_ph.width if right_ph else left_ph.left + left_ph.width) - left
     else:
-        region_left, region_top = Emu(838200), Emu(1825625)
-        region_width, region_height = Emu(10515600), Emu(4500000)
+        left, top = Emu(838200), Emu(1825625)
+        width, height = Emu(10515600), Emu(4500000)
 
+    return left_ph, right_ph, left, top, width, height
+
+
+def populate_two_content_layout(slide, slide_data: SlideData):
+    """Two Content layout — blockquote → left placeholder, text → right placeholder."""
+    _set_title(slide, slide_data.title)
+
+    bq_elements    = [e for e in slide_data.body_elements if isinstance(e, BlockquoteElement)]
+    text_elements  = [e for e in slide_data.body_elements if isinstance(e, TextElement)]
+    table_elements = [e for e in slide_data.body_elements if isinstance(e, TableElement)]
+    image_elements = [e for e in slide_data.body_elements if isinstance(e, ImageElement)]
+
+    left_ph, right_ph, rl, rt, rw, rh = _two_col_region(slide)
     gap    = Emu(200000)
-    half_w = (region_width - gap) // 2
-    right_l = region_left + half_w + gap
+    half_w = (rw - gap) // 2
+    right_l = rl + half_w + gap
 
     if bq_elements:
         left_paras  = [p for bq in bq_elements for p in bq.paragraphs]
@@ -245,39 +205,27 @@ def populate_two_content_layout(slide, slide_data: SlideData):
         left_paras  = collect_text_paragraphs(text_elements[:mid])
         right_paras = collect_text_paragraphs(text_elements[mid:])
 
-    def _fill_left(paras):
-        if left_ph:
-            set_text_frame(left_ph.text_frame, paras)
-        else:
-            tb = slide.shapes.add_textbox(region_left, region_top, half_w, region_height)
-            set_text_frame(tb.text_frame, paras)
-
-    def _fill_right(paras):
-        if right_ph:
-            set_text_frame(right_ph.text_frame, paras)
-        else:
-            tb = slide.shapes.add_textbox(right_l, region_top, half_w, region_height)
-            set_text_frame(tb.text_frame, paras)
-
     if left_paras:
-        _fill_left(left_paras)
+        if left_ph:
+            set_text_frame(left_ph.text_frame, left_paras)
+        else:
+            set_text_frame(slide.shapes.add_textbox(rl, rt, half_w, rh).text_frame, left_paras)
+
     if right_paras:
-        _fill_right(right_paras)
+        if right_ph:
+            set_text_frame(right_ph.text_frame, right_paras)
+        else:
+            set_text_frame(slide.shapes.add_textbox(right_l, rt, half_w, rh).text_frame, right_paras)
 
     for tbl_el in table_elements:
-        add_table_to_slide(slide, tbl_el, right_l, region_top, half_w, region_height)
+        add_table_to_slide(slide, tbl_el, right_l, rt, half_w, rh)
 
     if image_elements:
-        _stack_images(slide, image_elements, right_l, region_top, half_w, region_height)
+        _stack_images(slide, image_elements, right_l, rt, half_w, rh)
 
 
 def populate_mixed_layout(slide, slide_data: SlideData):
-    """Populate a mixed text-left + chart-right layout.
-
-    Uses Two Content placeholders (idx=1 left, idx=2 right) when available.
-    Falls back to textbox + free chart positioning.
-    Text/table elements go left; ChartElement goes right.
-    """
+    """Mixed layout — text/table left, chart(s) right."""
     _set_title(slide, slide_data.title)
 
     text_elements  = [e for e in slide_data.body_elements
@@ -285,60 +233,37 @@ def populate_mixed_layout(slide, slide_data: SlideData):
     table_elements = [e for e in slide_data.body_elements if isinstance(e, TableElement)]
     chart_elements = [e for e in slide_data.body_elements if isinstance(e, ChartElement)]
 
-    left_ph = right_ph = None
-    for ph in slide.placeholders:
-        idx = ph.placeholder_format.idx
-        if idx == 1:
-            left_ph = ph
-        elif idx == 2:
-            right_ph = ph
-
-    # Derive content region
-    if left_ph:
-        region_left, region_top = left_ph.left, left_ph.top
-        region_height = left_ph.height
-        right_end = (right_ph.left + right_ph.width) if right_ph else (left_ph.left + left_ph.width)
-        region_width = right_end - region_left
-    else:
-        region_left, region_top = Emu(838200), Emu(1825625)
-        region_width, region_height = Emu(10515600), Emu(4500000)
-
+    left_ph, right_ph, rl, rt, rw, rh = _two_col_region(slide)
     gap    = Emu(200000)
-    half_w = (region_width - gap) // 2
-    right_l = region_left + half_w + gap
+    half_w = (rw - gap) // 2
+    right_l = rl + half_w + gap
 
-    # Fill left: text via placeholder if available
+    # Left: text
     all_text_paras = []
     for e in text_elements:
         if isinstance(e, BlockquoteElement):
             all_text_paras.extend(e.paragraphs)
         else:
             all_text_paras.extend(collect_text_paragraphs([e]))
-    for tbl_el in table_elements:
-        pass  # tables go below text on left side
 
     if all_text_paras:
         if left_ph:
             set_text_frame(left_ph.text_frame, all_text_paras)
         else:
-            tb = slide.shapes.add_textbox(region_left, region_top, half_w, region_height)
-            set_text_frame(tb.text_frame, all_text_paras)
+            set_text_frame(slide.shapes.add_textbox(rl, rt, half_w, rh).text_frame, all_text_paras)
 
+    # Left: table (below text if any)
     for tbl_el in table_elements:
-        tbl_top = region_top + (region_height // 2 if all_text_paras else 0)
-        tbl_h   = region_height // 2 if all_text_paras else region_height
-        add_table_to_slide(slide, tbl_el, region_left, tbl_top, half_w, tbl_h)
+        tbl_top = rt + (rh // 2 if all_text_paras else 0)
+        tbl_h   = rh // 2 if all_text_paras else rh
+        add_table_to_slide(slide, tbl_el, rl, tbl_top, half_w, tbl_h)
 
-    # Fill right: chart(s) — hide right placeholder, draw chart in its area
-    if right_ph:
-        chart_left, chart_top = right_ph.left, right_ph.top
-        chart_w, chart_h = right_ph.width, right_ph.height
-        right_ph.text = ""  # clear placeholder text
-    else:
-        chart_left, chart_top = right_l, region_top
-        chart_w, chart_h = half_w, region_height
-
+    # Right: charts (use right placeholder geometry if available)
     if chart_elements:
+        chart_left = right_ph.left if right_ph else right_l
+        chart_top  = right_ph.top  if right_ph else rt
+        chart_w    = right_ph.width  if right_ph else half_w
+        chart_h    = right_ph.height if right_ph else rh
         n = len(chart_elements)
         per_h = (chart_h - gap * (n - 1)) // n
         for ci, chart_el in enumerate(chart_elements):
@@ -348,15 +273,13 @@ def populate_mixed_layout(slide, slide_data: SlideData):
 
 
 def populate_section_layout(slide, slide_data: SlideData):
-    """Populate a Section Header layout (idx 0=title, idx 1=description)."""
+    """Section Header layout — title (idx=0) + short description (idx=1)."""
+    _set_title(slide, slide_data.title)
     text_elements = [e for e in slide_data.body_elements if isinstance(e, TextElement)]
     paras = collect_text_paragraphs(text_elements)
-    for ph in slide.placeholders:
-        idx = ph.placeholder_format.idx
-        if idx == 0:
-            ph.text = slide_data.title
-        elif idx == 1 and paras and ph.has_text_frame:
-            set_text_frame(ph.text_frame, paras)
+    body_ph = next((ph for ph in slide.placeholders if ph.placeholder_format.idx == 1), None)
+    if body_ph and paras:
+        set_text_frame(body_ph.text_frame, paras)
 
 
 def populate_toc_layout(slide, slide_data: SlideData):

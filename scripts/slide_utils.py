@@ -439,8 +439,7 @@ def _get_fallback_layout(prs: Presentation, std_name: str) -> tuple:
         'image': ['title-only', 'standard'],
         'chart': ['title-only', 'standard'],
         'table': ['standard', 'title-only'],
-        'mixed': ['two-column', 'standard'],
-        'two-column': ['standard', 'title-only'],
+        'mixed': ['two-column', 'standard'],        'two-column': ['standard', 'title-only'],
     }
 
     fallbacks = fallback_map.get(std_name, ['standard'])
@@ -496,7 +495,9 @@ def select_layout(slide: SlideData, prs: Presentation) -> tuple:
         elif isinstance(e, TextElement):
             has_text = True
 
-    if has_chart:
+    if has_chart and (has_text or has_table):
+        std_name = 'mixed'
+    elif has_chart:
         std_name = 'chart'
     elif has_image and not has_text and not has_table:
         std_name = 'image'

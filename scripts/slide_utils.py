@@ -557,8 +557,7 @@ def set_text_frame(text_frame, paragraphs: list[Paragraph], clear: bool = True):
                 run.font.bold = True
             if run_data.italic:
                 run.font.italic = True
-            if is_heading:
-                run.font.size = Pt(16)
+            # Don't override font size for headings — inherit from placeholder
 
         if is_heading:
             # Suppress bullet inherited from placeholder's list style

@@ -89,7 +89,7 @@ PYTHONPATH=scripts python3 scripts/build_slides.py slides.md
 - Images (`![alt](path)`)
 - Blockquotes (`> text`) mapped to caption layouts
 - Mermaid diagrams (requires `npx @mermaid-js/mermaid-cli`)
-- Native Excel charts (```` ```chart ```` YAML blocks) — column, bar, line, pie
+- Native Excel charts (```` ```chart ```` YAML blocks) — column, bar, line, area, pie, doughnut, radar, scatter, bubble, waterfall, combo (16+ types)
 
 ## Project Structure
 
@@ -104,9 +104,12 @@ pptx-skills/
 ├── scripts/
 │   ├── slide_utils.py          # Shared: data structures, parser, layout, helpers
 │   ├── chart_utils.py          # Chart creation via python-pptx add_chart()
+│   ├── layout_standards.py     # Standard layout alias definitions
 │   ├── extract_template.py     # Template extraction CLI
 │   ├── extract_charts.py       # Chart extraction CLI
-│   └── build_slides.py         # Slide building CLI
+│   ├── build_slides.py         # Slide building CLI
+│   ├── list_layouts.py         # List all layouts in a template
+│   └── replace_logo.py         # Replace logo image in a template
 ├── examples/
 │   └── demo.md
 ├── requirements.txt

@@ -39,6 +39,6 @@ The output contains ```` ```chart ```` YAML blocks organized by slide, with comm
 
 ## Notes
 
-- Only charts with category data are extracted (column, bar, line, pie). Embedded images or non-chart shapes are skipped.
+- Only charts with category data are extracted (column, bar, line, area, pie, doughnut, radar and their variants). XY scatter, bubble, and composite charts are skipped.
 - Series names are preserved when available. Values are extracted as-is from the underlying Excel data.
 - The extracted blocks are a starting point — users can modify values, titles, colors, and chart types before rebuilding.
